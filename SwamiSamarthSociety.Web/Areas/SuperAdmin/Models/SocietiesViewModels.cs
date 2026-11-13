@@ -49,4 +49,14 @@ namespace SwamiSamarthSociety.Web.Areas.SuperAdmin.Models
         public string AdminEmail { get; set; } = null!;
         public string TempPassword { get; set; } = null!;
     }
+
+    public class ActivityLogItemViewModel
+    {
+        public DateTime ChangedDate { get; set; }
+        public string SocietyName { get; set; } = null!;
+        public string TableName { get; set; } = null!;
+        public string Action { get; set; } = null!;
+        public string? ChangedBy { get; set; }
+        public string? NewValue { get; set; }
+    }
 }

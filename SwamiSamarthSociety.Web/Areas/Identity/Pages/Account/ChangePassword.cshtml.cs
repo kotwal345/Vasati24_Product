@@ -5,11 +5,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.RateLimiting;
 using SwamiSamarthSociety.Data.Entities;
 
 namespace SwamiSamarthSociety.Web.Areas.Identity.Pages.Account
 {
     [Authorize]
+    [EnableRateLimiting("auth")]
     public class ChangePasswordModel : PageModel
     {
         private readonly UserManager<ApplicationUser> _userManager;

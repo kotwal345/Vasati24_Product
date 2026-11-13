@@ -1,4 +1,6 @@
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using SwamiSamarthSociety.Data;
 using SwamiSamarthSociety.Data.Entities;
@@ -28,11 +30,51 @@ public class Program
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddScoped<ICurrentSocietyContext, CurrentSocietyContext>();
 
-        builder.Services.AddDefaultIdentity<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = false)
+        builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
+            {
+                options.SignIn.RequireConfirmedAccount = false;
+
+                // Up from the framework default of 6 -- every account here is either
+                // admin-provisioned (TempPasswordGenerator already produces 12-char passwords
+                // meeting this) or self-chosen at the forced first-login change.
+                options.Password.RequiredLength = 8;
+
+                // Framework defaults, made explicit rather than implicitly relied on: 5 failed
+                // attempts locks the account out for 5 minutes. Per-account, not per-IP -- see
+                // the "auth" rate limiter below for the per-IP layer this doesn't cover.
+                options.Lockout.MaxFailedAccessAttempts = 5;
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
+            })
             .AddRoles<IdentityRole>()
             .AddClaimsPrincipalFactory<AppUserClaimsPrincipalFactory>()
             .AddEntityFrameworkStores<ApplicationDbContext>();
 
+        builder.Services.ConfigureApplicationCookie(options =>
+        {
+            options.Cookie.HttpOnly = true;
+            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+            options.Cookie.SameSite = SameSiteMode.Lax;
+        });
+
+        // Per-IP throttle on auth endpoints -- Identity's account lockout above is per-account,
+        // so on its own it doesn't slow an attacker probing many different email addresses from
+        // one IP. Partitioned by client IP (not a single shared bucket) so one busy legitimate
+        // client can never rate-limit an unrelated one. Applied via [EnableRateLimiting("auth")].
+        builder.Services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.AddPolicy("auth", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 10,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                    AutoReplenishment = true
+                }));
+        });
+
+        builder.Services.AddScoped<IAuditLogService, AuditLogService>();
         builder.Services.AddScoped<IMemberService, MemberService>();
         builder.Services.AddScoped<IInterestCalculationService, InterestCalculationService>();
         builder.Services.AddScoped<IInstallmentCalculationService, InstallmentCalculationService>();
@@ -80,6 +122,16 @@ public class Program
 
             user.MustChangePassword = true;
             userManager.UpdateAsync(user).GetAwaiter().GetResult();
+
+            // Only society-scoped accounts get an audit entry -- AuditLog is per-society, and
+            // the SuperAdmin's own account (SocietyId == null) has no society to attribute it to.
+            if (user.SocietyId is { } societyId)
+            {
+                var auditLogService = scope.ServiceProvider.GetRequiredService<IAuditLogService>();
+                auditLogService.LogAsync(societyId, "AspNetUsers", 0, "PasswordResetByAdmin", "CLI: --reset-password", newValue: email)
+                    .GetAwaiter().GetResult();
+            }
+
             Console.WriteLine($"Password reset for {email}. They'll be prompted to set their own on next login.");
             return;
         }
@@ -101,10 +153,12 @@ public class Program
             app.UseHsts();
         }
 
+        app.UseMiddleware<SecurityHeadersMiddleware>();
         app.UseHttpsRedirection();
         app.UseStaticFiles();
 
         app.UseRouting();
+        app.UseRateLimiter();
         app.UseAuthentication();
         app.UseAuthorization();
         app.UseMiddleware<RequirePasswordChangeMiddleware>();

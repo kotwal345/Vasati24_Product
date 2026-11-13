@@ -33,6 +33,7 @@ else
                     <th>Email</th>
                     <th>Role</th>
                     <th>Status</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
@@ -42,13 +43,35 @@ else
                         <td>@u.Email</td>
                         <td><span class="badge bg-secondary">@u.Role</span></td>
                         <td>
-                            @if (u.MustChangePassword)
+                            @if (u.IsLockedOut)
+                            {
+                                <span class="badge bg-secondary">Deactivated</span>
+                            }
+                            else if (u.MustChangePassword)
                             {
                                 <span class="badge bg-warning text-dark">Password not yet set</span>
                             }
                             else
                             {
                                 <span class="badge bg-success">Active</span>
+                            }
+                        </td>
+                        <td class="text-end">
+                            @if (u.Role == AppRoles.Member)
+                            {
+                                @if (u.IsLockedOut)
+                                {
+                                    <form asp-action="Reactivate" asp-route-id="@u.Id" method="post" data-disable-on-submit class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-outline-primary">Reactivate</button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <form asp-action="Deactivate" asp-route-id="@u.Id" method="post" data-disable-on-submit class="d-inline"
+                                          onsubmit="return confirm('Deactivate @u.Email? They will no longer be able to log in.');">
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary">Deactivate</button>
+                                    </form>
+                                }
                             }
                         </td>
                     </tr>

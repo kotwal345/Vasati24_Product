@@ -54,6 +54,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         b.Entity<FinancialTransaction>().ToTable("FinancialTransaction");
         b.Entity<MemberExitSettlement>().ToTable("MemberExitSettlement");
         b.Entity<AuditLog>().ToTable("AuditLog");
+        // The table predates this Action column being written to -- it was originally created
+        // nvarchar(20), too narrow for values like "MemberLoginDeactivated". Widened here and in
+        // the migration that alters the live column to match.
+        b.Entity<AuditLog>().Property(a => a.Action).HasMaxLength(100);
         b.Entity<ImportLog>().ToTable("ImportLog");
         b.Entity<SmsLog>().ToTable("SmsLog");
         b.Entity<SmsLog>().HasOne(s => s.Member).WithMany().HasForeignKey(s => s.MemberId).OnDelete(DeleteBehavior.Restrict);

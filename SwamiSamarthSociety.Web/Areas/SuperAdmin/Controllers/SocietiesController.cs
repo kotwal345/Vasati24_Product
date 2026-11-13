@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SwamiSamarthSociety.Data;
 using SwamiSamarthSociety.Data.Entities;
+using SwamiSamarthSociety.Services;
 using SwamiSamarthSociety.Web.Areas.SuperAdmin.Models;
 using SwamiSamarthSociety.Web.Identity;
 
@@ -15,11 +16,13 @@ namespace SwamiSamarthSociety.Web.Areas.SuperAdmin.Controllers
     {
         private readonly ApplicationDbContext _db;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IAuditLogService _auditLog;
 
-        public SocietiesController(ApplicationDbContext db, UserManager<ApplicationUser> userManager)
+        public SocietiesController(ApplicationDbContext db, UserManager<ApplicationUser> userManager, IAuditLogService auditLog)
         {
             _db = db;
             _userManager = userManager;
+            _auditLog = auditLog;
         }
 
         // SuperAdmin has no SocietyId, so every query here deliberately ignores the tenant
@@ -102,6 +105,9 @@ namespace SwamiSamarthSociety.Web.Areas.SuperAdmin.Controllers
             }
             await _userManager.AddToRoleAsync(admin, AppRoles.SocietyAdmin);
 
+            await _auditLog.LogAsync(society.SocietyId, "Society", society.SocietyId, "Created", User.Identity?.Name,
+                newValue: $"{society.Name} ({society.Code}), admin: {admin.Email}");
+
             TempData["CreatedSocietyName"] = society.Name;
             TempData["CreatedAdminEmail"] = admin.Email;
             TempData["CreatedTempPassword"] = tempPassword;
@@ -133,6 +139,7 @@ namespace SwamiSamarthSociety.Web.Areas.SuperAdmin.Controllers
             society.IsActive = false;
             society.DeactivatedDate = DateTime.UtcNow;
             await _db.SaveChangesAsync();
+            await _auditLog.LogAsync(society.SocietyId, "Society", society.SocietyId, "Deactivated", User.Identity?.Name);
             TempData["Success"] = $"{society.Name} has been deactivated.";
             return RedirectToAction(nameof(Index));
         }
@@ -147,8 +154,36 @@ namespace SwamiSamarthSociety.Web.Areas.SuperAdmin.Controllers
             society.IsActive = true;
             society.DeactivatedDate = null;
             await _db.SaveChangesAsync();
+            await _auditLog.LogAsync(society.SocietyId, "Society", society.SocietyId, "Reactivated", User.Identity?.Name);
             TempData["Success"] = $"{society.Name} has been reactivated.";
             return RedirectToAction(nameof(Index));
+        }
+
+        // Platform-wide activity trail -- the last 100 audited actions across every society,
+        // newest first. Ignores the (non-existent-for-AuditLog-anyway, since SuperAdmin bypasses
+        // it) tenant filter the same way Index() does, since this view is deliberately
+        // cross-society.
+        public async Task<IActionResult> Activity()
+        {
+            var logs = await _db.AuditLogs.IgnoreQueryFilters()
+                .OrderByDescending(a => a.ChangedDate)
+                .Take(100)
+                .ToListAsync();
+
+            var societyNames = await _db.Societies.IgnoreQueryFilters()
+                .ToDictionaryAsync(s => s.SocietyId, s => s.Name);
+
+            var vms = logs.Select(l => new ActivityLogItemViewModel
+            {
+                ChangedDate = l.ChangedDate,
+                SocietyName = societyNames.GetValueOrDefault(l.SocietyId, "(unknown)"),
+                TableName = l.TableName,
+                Action = l.Action,
+                ChangedBy = l.ChangedBy,
+                NewValue = l.NewValue
+            }).ToList();
+
+            return View(vms);
         }
     }
 }

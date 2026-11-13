@@ -22,3 +22,22 @@
         if (e.key === 'Escape') setOpen(false);
     });
 })();
+
+// Disables a form's submit button (and shows a spinner) the moment it's submitted, so a slow
+// request or an impatient double-click can't fire a Create/Deactivate/Reactivate action twice.
+// Opt in per-form with data-disable-on-submit; skipped if client-side validation blocks the
+// submit, so a fixable validation error never leaves the button stuck disabled.
+(function () {
+    document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-disable-on-submit')) return;
+        if (form.checkValidity && !form.checkValidity()) return;
+
+        var button = form.querySelector('button[type="submit"]');
+        if (!button || button.disabled) return;
+
+        button.disabled = true;
+        button.dataset.originalText = button.innerHTML;
+        button.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span>' + button.textContent;
+    });
+})();

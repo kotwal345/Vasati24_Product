@@ -8,6 +8,7 @@ namespace SwamiSamarthSociety.Web.Models
         public string Email { get; set; } = null!;
         public string Role { get; set; } = null!;
         public bool MustChangePassword { get; set; }
+        public bool IsLockedOut { get; set; }
     }
 
     public class CreateMemberLoginViewModel

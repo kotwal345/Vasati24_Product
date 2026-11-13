@@ -118,14 +118,14 @@ else
                     <span class="society-created">@Icons.Render("calendar", "icon-sm") Since @s.CreatedDate.ToString("MMM yyyy")</span>
                     @if (s.IsActive)
                     {
-                        <form asp-action="Deactivate" asp-route-id="@s.SocietyId" method="post"
+                        <form asp-action="Deactivate" asp-route-id="@s.SocietyId" method="post" data-disable-on-submit
                               onsubmit="return confirm('Deactivate @s.Name? Its users will no longer be able to log in. Data is kept.');">
                             <button type="submit" class="btn btn-sm btn-outline-secondary">Deactivate</button>
                         </form>
                     }
                     else
                     {
-                        <form asp-action="Reactivate" asp-route-id="@s.SocietyId" method="post">
+                        <form asp-action="Reactivate" asp-route-id="@s.SocietyId" method="post" data-disable-on-submit>
                             <button type="submit" class="btn btn-sm btn-outline-primary">Reactivate</button>
                         </form>
                     }

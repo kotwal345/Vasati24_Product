@@ -20,12 +20,14 @@ namespace SwamiSamarthSociety.Web.Controllers
         private readonly ApplicationDbContext _db;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ICurrentSocietyContext _tenant;
+        private readonly IAuditLogService _auditLog;
 
-        public UsersController(ApplicationDbContext db, UserManager<ApplicationUser> userManager, ICurrentSocietyContext tenant)
+        public UsersController(ApplicationDbContext db, UserManager<ApplicationUser> userManager, ICurrentSocietyContext tenant, IAuditLogService auditLog)
         {
             _db = db;
             _userManager = userManager;
             _tenant = tenant;
+            _auditLog = auditLog;
         }
 
         public async Task<IActionResult> Index()
@@ -40,7 +42,8 @@ namespace SwamiSamarthSociety.Web.Controllers
                     Id = u.Id,
                     Email = u.Email ?? "",
                     Role = roles.FirstOrDefault() ?? "(none)",
-                    MustChangePassword = u.MustChangePassword
+                    MustChangePassword = u.MustChangePassword,
+                    IsLockedOut = await _userManager.IsLockedOutAsync(u)
                 });
             }
             return View(vms);
@@ -79,6 +82,8 @@ namespace SwamiSamarthSociety.Web.Controllers
             }
             await _userManager.AddToRoleAsync(member, AppRoles.Member);
 
+            await _auditLog.LogAsync(_tenant.SocietyId!.Value, "AspNetUsers", 0, "MemberLoginCreated", User.Identity?.Name, newValue: member.Email);
+
             TempData["CreatedEmail"] = member.Email;
             TempData["CreatedTempPassword"] = tempPassword;
             return RedirectToAction(nameof(Created));
@@ -94,6 +99,46 @@ namespace SwamiSamarthSociety.Web.Controllers
                 TempPassword = TempData["CreatedTempPassword"] as string ?? ""
             };
             return View(vm);
+        }
+
+        // Only ever targets Member-role logins within the caller's own society -- a SocietyAdmin
+        // can't deactivate themselves or another SocietyAdmin this way (that's a SuperAdmin-only
+        // concern, avoids a self-lockout footgun), and the SocietyId filter on the lookup means
+        // an id from another society 404s rather than silently no-op'ing.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Deactivate(string id)
+        {
+            var user = await FindOwnMemberAsync(id);
+            if (user is null) return NotFound();
+
+            await _userManager.SetLockoutEnabledAsync(user, true);
+            await _userManager.SetLockoutEndDateAsync(user, DateTimeOffset.MaxValue);
+            await _auditLog.LogAsync(_tenant.SocietyId!.Value, "AspNetUsers", 0, "MemberLoginDeactivated", User.Identity?.Name, newValue: user.Email);
+            TempData["Success"] = $"{user.Email} can no longer sign in.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Reactivate(string id)
+        {
+            var user = await FindOwnMemberAsync(id);
+            if (user is null) return NotFound();
+
+            await _userManager.SetLockoutEndDateAsync(user, null);
+            await _auditLog.LogAsync(_tenant.SocietyId!.Value, "AspNetUsers", 0, "MemberLoginReactivated", User.Identity?.Name, newValue: user.Email);
+            TempData["Success"] = $"{user.Email} can sign in again.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        private async Task<ApplicationUser?> FindOwnMemberAsync(string id)
+        {
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id && u.SocietyId == _tenant.SocietyId);
+            if (user is null) return null;
+
+            var roles = await _userManager.GetRolesAsync(user);
+            return roles.Contains(AppRoles.Member) ? user : null;
         }
     }
 }

@@ -72,11 +72,18 @@
                     <input asp-for="Input.RememberMe" type="checkbox" />
                     Remember me
                 </label>
-                <a asp-area="Identity" asp-page="/Account/ForgotPassword">Forgot password?</a>
             </div>
 
             <button type="submit" class="auth-submit">Sign in</button>
         </form>
+
+        @* No self-service "forgot password" -- there's no email sender configured, so the
+           Identity UI's default ForgotPassword page would throw if linked here. Every login is
+           admin-provisioned (see the note below), so a forgotten password goes through the same
+           admin who created the account. *@
+        <p class="auth-summary" style="background: #f7f8fc; color: var(--auth-muted); border: 1px solid var(--auth-border);">
+            Forgotten your password? Contact your society admin to have it reset.
+        </p>
 
         @* Self-registration has been removed entirely -- every login (SocietyAdmin, Member) is
            provisioned by an admin (SuperAdmin creates SocietyAdmins; SocietyAdmin creates

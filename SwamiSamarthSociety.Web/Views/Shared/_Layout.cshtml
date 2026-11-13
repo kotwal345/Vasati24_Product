@@ -29,11 +29,15 @@
             <nav class="sidebar-nav">
                 @{
                     var currentArea = ViewContext.RouteData.Values["area"]?.ToString();
+                    var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
                 }
                 @if (User.IsInRole(AppRoles.SuperAdmin))
                 {
-                    <a class="sidebar-link @(currentArea == "SuperAdmin" ? "active" : "")" asp-area="SuperAdmin" asp-controller="Societies" asp-action="Index">
+                    <a class="sidebar-link @(currentArea == "SuperAdmin" && currentAction != "Activity" ? "active" : "")" asp-area="SuperAdmin" asp-controller="Societies" asp-action="Index">
                         @Icons.Render("layers")<span>Societies</span>
+                    </a>
+                    <a class="sidebar-link @(currentArea == "SuperAdmin" && currentAction == "Activity" ? "active" : "")" asp-area="SuperAdmin" asp-controller="Societies" asp-action="Activity">
+                        @Icons.Render("file-text")<span>Activity</span>
                     </a>
                 }
                 else

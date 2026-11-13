@@ -5,12 +5,14 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using SwamiSamarthSociety.Data;
 using SwamiSamarthSociety.Data.Entities;
 
 namespace SwamiSamarthSociety.Web.Areas.Identity.Pages.Account
 {
+    [EnableRateLimiting("auth")]
     public class LoginModel : PageModel
     {
         private readonly SignInManager<ApplicationUser> _signInManager;

@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using SwamiSamarthSociety.Data;
 using SwamiSamarthSociety.Data.Entities;
 using SwamiSamarthSociety.Services;
 using SwamiSamarthSociety.Web.Models;
+using SwamiSamarthSociety.Web.Reporting;
 
 namespace SwamiSamarthSociety.Web.Controllers
 {
@@ -10,7 +13,35 @@ namespace SwamiSamarthSociety.Web.Controllers
     public class LoansController : Controller
     {
         private readonly ILoanService _loanService;
-        public LoansController(ILoanService loanService) => _loanService = loanService;
+        private readonly ApplicationDbContext _db;
+        private readonly ICurrentSocietyContext _tenant;
+        private readonly IInstallmentCalculationService _installmentCalc;
+        private readonly IInterestCalculationService _interestCalc;
+
+        public LoansController(
+            ILoanService loanService,
+            ApplicationDbContext db,
+            ICurrentSocietyContext tenant,
+            IInstallmentCalculationService installmentCalc,
+            IInterestCalculationService interestCalc)
+        {
+            _loanService = loanService;
+            _db = db;
+            _tenant = tenant;
+            _installmentCalc = installmentCalc;
+            _interestCalc = interestCalc;
+        }
+
+        public async Task<IActionResult> ExportPdf(int id)
+        {
+            var loan = await _loanService.GetByIdAsync(id);
+            if (loan is null) return NotFound();
+
+            var society = await _db.Societies.FirstAsync(s => s.SocietyId == _tenant.SocietyId);
+            var rules = await _db.LoanInstallmentRules.Where(r => r.IsActive).ToListAsync();
+            var bytes = LoanSchedulePdfExporter.Export(society, loan, rules, _installmentCalc, _interestCalc);
+            return File(bytes, "application/pdf", $"{loan.LoanNumber}_EMI_Schedule.pdf");
+        }
 
         public async Task<IActionResult> Index(string? status = null)
         {

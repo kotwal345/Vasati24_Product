@@ -9,7 +9,10 @@
         <h1>Loan @Model.LoanNumber</h1>
         <p class="page-subtitle">Full details and installment history for this loan.</p>
     </div>
-    <a asp-action="Index" class="btn btn-outline-secondary">Back to list</a>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-action="ExportPdf" asp-route-id="@Model.LoanId" class="btn btn-outline-primary">@Icons.Render("file-text", "icon-sm")Export PDF</a>
+        <a asp-action="Index" class="btn btn-outline-secondary">Back to list</a>
+    </div>
 </div>
 
 @if (TempData["Success"] != null)

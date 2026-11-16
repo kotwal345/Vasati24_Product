@@ -35,6 +35,7 @@
                 <button type="submit" class="btn btn-outline-secondary" title="Re-check every unpaid row against last cycle's payment status and apply rule (b)'s penalty + arrears where due">@Icons.Render("percent", "icon-sm")Recalculate Penalties &amp; Arrears</button>
             </form>
         }
+        <a asp-action="ExportCollectionPdf" asp-route-id="@cycle.MonthlyCycleId" class="btn btn-outline-primary">@Icons.Render("file-text", "icon-sm")Export Collection PDF</a>
         <a asp-action="ExportExcel" asp-route-id="@cycle.MonthlyCycleId" class="btn btn-outline-primary">@Icons.Render("download", "icon-sm")Export Excel</a>
         <a asp-action="ExportPdf" asp-route-id="@cycle.MonthlyCycleId" class="btn btn-outline-primary">@Icons.Render("file-text", "icon-sm")Export PDF</a>
         <a asp-action="Index" class="btn btn-outline-secondary">All Cycles</a>

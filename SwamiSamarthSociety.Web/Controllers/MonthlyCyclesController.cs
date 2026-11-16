@@ -78,6 +78,18 @@ namespace SwamiSamarthSociety.Web.Controllers
             return File(bytes, "application/pdf", fileName);
         }
 
+        public async Task<IActionResult> ExportCollectionPdf(int id)
+        {
+            var cycle = await _cycleService.GetByIdAsync(id);
+            if (cycle is null) return NotFound();
+
+            var rows = await _cycleService.GetCollectionSheetRowsAsync(id);
+            var society = await GetCurrentSocietyAsync();
+            var bytes = MonthlyCollectionSheetPdfExporter.ExportCollection(society, cycle, rows);
+            var fileName = $"{society.Code}_{cycle.Year}-{cycle.Month:D2}_Collection.pdf";
+            return File(bytes, "application/pdf", fileName);
+        }
+
         [Authorize(Roles = AppRoles.SocietyAdmin)]
         public async Task<IActionResult> OpenNextCycle()
         {

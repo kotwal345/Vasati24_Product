@@ -194,7 +194,11 @@ namespace SwamiSamarthSociety.Services
             var afterPenalty = afterInterest - penaltyPaid;
             var arrearsPaid = Math.Min(afterPenalty, installment.ArrearsAmount);
             var afterArrears = afterPenalty - arrearsPaid;
-            var principalPaid = Math.Min(afterArrears, installment.PrincipalAmount);
+            // Anything paid beyond this month's due principal is a prepayment against the remaining
+            // balance (arrears are already part of OpeningPrincipal), so a member can close the loan
+            // early by paying the full balance + this month's interest in one go.
+            var maxPrincipal = Math.Max(installment.PrincipalAmount, installment.OpeningPrincipal - arrearsPaid);
+            var principalPaid = Math.Min(afterArrears, maxPrincipal);
             return (interestPaid, penaltyPaid, arrearsPaid, principalPaid);
         }
     }

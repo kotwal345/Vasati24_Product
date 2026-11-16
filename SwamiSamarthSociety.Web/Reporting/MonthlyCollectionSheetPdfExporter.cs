@@ -34,6 +34,69 @@ namespace SwamiSamarthSociety.Web.Reporting
         public static byte[] Export(Society society, MonthlyCycle cycle, List<MonthlyCycleRow> rows) =>
             BuildDocument(society, cycle, rows).GeneratePdf();
 
+        // Slim variant: only अ. क्र, सभासदाचे नाव and एकूण रक्कम, on a portrait A4 page.
+        public static byte[] ExportCollection(Society society, MonthlyCycle cycle, List<MonthlyCycleRow> rows)
+        {
+            var titleLine = $"|| {society.NameMarathi ?? society.Name} ||";
+            return Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.A4);
+                    page.Margin(20);
+                    page.DefaultTextStyle(x => x.FontFamily(FontFamily).FontSize(10));
+
+                    page.Header().Background(TitleBg).Padding(5).Column(col =>
+                    {
+                        col.Item().AlignCenter().Text(titleLine).Bold().FontSize(14);
+                        if (!string.IsNullOrWhiteSpace(society.Address))
+                            col.Item().AlignCenter().Text(society.Address).FontSize(9);
+                        col.Item().PaddingTop(2).AlignCenter().Text($"महिना - {MarathiMonths[cycle.Month]} {cycle.Year}").Bold().FontSize(10);
+                    });
+
+                    page.Content().PaddingTop(6).Table(table =>
+                    {
+                        table.ColumnsDefinition(columns =>
+                        {
+                            columns.ConstantColumn(40);
+                            columns.RelativeColumn(3);
+                            columns.RelativeColumn(1.5f);
+                        });
+
+                        table.Header(header =>
+                        {
+                            foreach (var h in new[] { Headers[0], Headers[1], Headers[9] })
+                                header.Cell().Background(HeaderBg).Border(0.5f).BorderColor(BorderColor)
+                                    .Padding(3).AlignCenter().Text(h).Bold();
+                        });
+
+                        decimal total = 0;
+                        var srNo = 1;
+                        foreach (var row in rows)
+                        {
+                            var bg = row.HasActiveLoan ? LoanRowBg : "#FFFFFF";
+                            table.Cell().Background(bg).Border(0.5f).BorderColor(BorderColor).Padding(3).AlignCenter().Text(srNo.ToString());
+                            table.Cell().Background(bg).Border(0.5f).BorderColor(BorderColor).Padding(3).Text(row.FullNameMarathi ?? row.FullName);
+                            table.Cell().Background(TotalAmountBg).Border(0.5f).BorderColor(BorderColor).Padding(3).AlignRight().Text($"{row.TotalAmount:N0}");
+                            total += row.TotalAmount;
+                            srNo++;
+                        }
+
+                        table.Cell().Background(TitleBg).Border(0.5f).BorderColor(BorderColor).Padding(3).Text("");
+                        table.Cell().Background(TitleBg).Border(0.5f).BorderColor(BorderColor).Padding(3).Text("Total").Bold();
+                        table.Cell().Background(TitleBg).Border(0.5f).BorderColor(BorderColor).Padding(3).AlignRight().Text($"{total:N0}").Bold();
+                    });
+
+                    page.Footer().AlignRight().Text(x =>
+                    {
+                        x.CurrentPageNumber();
+                        x.Span(" / ");
+                        x.TotalPages();
+                    });
+                });
+            }).GeneratePdf();
+        }
+
         public static IDocument BuildDocument(Society society, MonthlyCycle cycle, List<MonthlyCycleRow> rows)
         {
             var titleLine = $"|| {society.NameMarathi ?? society.Name} ||";
